@@ -1,0 +1,24 @@
+# Python ortamı ve önbellek
+.venv/
+__pycache__/
+*.py[cod]
+
+# Büyük model ağırlıkları
+models/*.pt
+models/*.pth
+models/*.onnx
+
+# Deney çıktıları
+outputs/*
+!outputs/.gitkeep
+
+# Sistem/VS Code dosyaları
+.vscode/
+.DS_Store
+
+# İndirilen / türetilen model dosyaları ve üçüncü taraf repolar
+*.pt
+third_party/
+# YOLOv7 referans kodu ile model çıktı dosyaları
+third_party/
+*.pt
