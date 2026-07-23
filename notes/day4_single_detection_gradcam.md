@@ -357,6 +357,44 @@ Yorum:
 - Bu sonuç, ham aday eşleştirme ve class-score target yaklaşımının çalıştığını; klasik Grad-CAM'deki aynı-harita probleminin büyük ölçüde yöntemin uzamsal gradyan ortalamasından kaynaklandığını destekler.
 - Bu örnek için HiResCAM, klasik Grad-CAM'e göre çok daha detection-specific bir açıklama üretmektedir.
 - Yine de kutu içinde aktivasyon bulunması modelin hatasının kesin nedenini kanıtlamaz; yöntem model skoruyla ilişkili konumu gösterir.
+### HiResCAM görsel yorumu
+
+**Detection index 0:**
+
+- Yeşil kutu soldaki büyük beyaz atı kapsamaktadır.
+- Tek güçlü sıcak bölge seçili atın gövdesinin alt-orta kısmında, ön bacaklara yakın bölgede oluşmuştur.
+- Diğer atlarda ve arka planda belirgin sıcak aktivasyon görünmemektedir.
+
+**Detection index 1:**
+
+- Yeşil kutu sağdaki gri atı kapsamaktadır.
+- Güçlü sıcak bölge yalnızca seçili gri atın gövdesinin merkezinde oluşmuştur.
+- Soldaki ve ortadaki diğer atlarda belirgin sıcak aktivasyon görünmemektedir.
+
+**Karşılaştırmalı yorum:**
+
+- Detection index değiştiğinde sıcak bölge de doğru seçili ata taşınmaktadır.
+- Bu davranış, HiResCAM'in bu örnekte klasik Grad-CAM'e göre çok daha detection-specific olduğunu görsel olarak doğrulamaktadır.
+- Her iki harita da baş, kuyruk veya bütün siluet yerine gövdenin küçük bir bölümünü vurgulamaktadır. Bu, modelin class skoruyla en güçlü ilişkili yerel bölgenin gövde olduğunu düşündürür; ancak modelin yalnızca bu özelliğe dayanarak karar verdiğini kanıtlamaz.
+- Sıcak bölgelerin küçük ve elmas/piksel bloklu görünmesi layer `104` feature map'inin düşük uzamsal çözünürlüğünün `640 × 640` görüntüye büyütülmesinden kaynaklanır.
+- Sonuç konum açısından başarılıdır; fakat ayrıntılı anatomik yorum için layer `104` çözünürlüğü sınırlıdır.
+## Aynı detection için GradCAM ve HiResCAM
+
+Aynı seçili detection üzerinde yalnızca CAM yöntemi değiştirilerek GradCAM ve HiResCAM ham matrisleri karşılaştırıldı.
+
+| Detection | Pearson | Kosinüs | Ortalama mutlak fark | En sıcak %10 örtüşmesi |
+|---:|---:|---:|---:|---:|
+| Index `0` | `0.183199` | `0.189083` | `0.217568` | `0.096226` |
+| Index `1` | `0.155063` | `0.167310` | `0.217579` | `0.071079` |
+
+Yorum:
+
+- Aynı detection hedeflenmesine rağmen GradCAM ve HiResCAM haritaları düşük benzerliğe sahiptir.
+- En sıcak %10 bölgelerin örtüşmesi index 0 için yaklaşık `%9.6`, index 1 için yaklaşık `%7.1`dir.
+- HiResCAM, GradCAM sonucunu yalnızca görsel olarak daraltmamış; uzamsal olarak farklı bir açıklama üretmiştir.
+- GradCAM geniş bir at sırası bandını vurgularken HiResCAM seçilen atın gövdesinde küçük ve ayrışmış bir bölge üretmiştir.
+- Her yöntem kendi CAM matrisini `0–1` aralığında bağımsız normalize ettiği için ortalama aktivasyon büyüklükleri yöntemler arasında doğrudan “daha güçlü” veya “daha zayıf” olarak yorumlanmamalıdır.
+- Yöntem seçimi, heatmap sonucunu ve yapılacak yorumu ciddi biçimde değiştirmektedir. Bu nedenle raporda kullanılan yöntem mutlaka açıkça belirtilmelidir.
 ## Bugünkü genel çıkarımlar
 
 - Grad-CAM'in bir kutuyu açıklayabilmesi için önce NMS sonrası kutunun doğru ham adayla eşleştirilmesi gerekir.
@@ -368,6 +406,4 @@ Yorum:
 ## Sonraki adımlar
 
 - Kutu içi yeniden normalizasyonu ayrı bir deney olarak uygulayıp sonucu yanıltıcı biçimde güzelleştirip güzelleştirmediğini tartışmak.
-- İki HiResCAM overlay'ini görsel olarak incelemek.
-- Aynı detection üzerinde GradCAM ve HiResCAM sonuçlarını yan yana karşılaştırmak.
 - Deney sonuçlarını bu Gün 4 notuna eklemeye devam etmek.
