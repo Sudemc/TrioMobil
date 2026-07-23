@@ -65,6 +65,7 @@ def arguments() -> argparse.Namespace:
         choices=["GradCAM", "HiResCAM", "LayerCAM"],
         default="GradCAM",
     )
+    parser.add_argument("--renormalize-within-box", action="store_true")
     parser.add_argument("--device", default="cuda:0")
     return parser.parse_args()
 
@@ -73,6 +74,18 @@ def save_grayscale_cam(grayscale_cam: np.ndarray, output: Path) -> None:
     np.save(output / "cam_grayscale.npy", grayscale_cam)
     grayscale_image = (np.clip(grayscale_cam, 0.0, 1.0) * 255).astype(np.uint8)
     cv2.imwrite(str(output / "cam_grayscale.png"), grayscale_image)
+
+
+def renormalize_cam_within_box(
+    grayscale_cam: np.ndarray, box: tuple[int, int, int, int]
+) -> np.ndarray:
+    x1, y1, x2, y2 = box
+    result = np.zeros_like(grayscale_cam)
+    region = grayscale_cam[y1:y2, x1:x2]
+    region = region - region.min()
+    region = region / (region.max() + 1e-7)
+    result[y1:y2, x1:x2] = region
+    return result
 
 
 def main() -> None:
@@ -119,12 +132,19 @@ def main() -> None:
         targets=[ClassScoreTarget(raw_index, class_id)],
     )[0]
     save_grayscale_cam(grayscale_cam, output)
+    x1, y1, x2, y2, confidence, _ = selected.detach().cpu().tolist()
+    visualization_cam = grayscale_cam
+    if args.renormalize_within_box:
+        box = (int(x1), int(y1), int(x2), int(y2))
+        visualization_cam = renormalize_cam_within_box(grayscale_cam, box)
+        np.save(output / "cam_renormalized.npy", visualization_cam)
+        renormalized_image = (visualization_cam * 255).astype(np.uint8)
+        cv2.imwrite(str(output / "cam_renormalized.png"), renormalized_image)
     overlay = cv2.cvtColor(
-        show_cam_on_image(rgb_image, grayscale_cam, use_rgb=True),
+        show_cam_on_image(rgb_image, visualization_cam, use_rgb=True),
         cv2.COLOR_RGB2BGR,
     )
 
-    x1, y1, x2, y2, confidence, _ = selected.detach().cpu().tolist()
     cv2.rectangle(overlay, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
     label = f"{model.names[class_id]} {confidence:.2f}"
     cv2.putText(
@@ -152,7 +172,12 @@ def main() -> None:
         "detection_confidence": confidence,
         "selected_box_xyxy": [x1, y1, x2, y2],
         "raw_candidate_index": raw_index,
-        "renormalize": False,
+        "renormalize": args.renormalize_within_box,
+        "visualized_cam": (
+            "cam_renormalized.npy"
+            if args.renormalize_within_box
+            else "cam_grayscale.npy"
+        ),
         "raw_cam_numpy": "cam_grayscale.npy",
         "raw_cam_image": "cam_grayscale.png",
     }

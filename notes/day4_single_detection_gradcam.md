@@ -395,6 +395,36 @@ Yorum:
 - GradCAM geniş bir at sırası bandını vurgularken HiResCAM seçilen atın gövdesinde küçük ve ayrışmış bir bölge üretmiştir.
 - Her yöntem kendi CAM matrisini `0–1` aralığında bağımsız normalize ettiği için ortalama aktivasyon büyüklükleri yöntemler arasında doğrudan “daha güçlü” veya “daha zayıf” olarak yorumlanmamalıdır.
 - Yöntem seçimi, heatmap sonucunu ve yapılacak yorumu ciddi biçimde değiştirmektedir. Bu nedenle raporda kullanılan yöntem mutlaka açıkça belirtilmelidir.
+## Kutu içi yeniden normalizasyon deneyi
+
+Klasik `GradCAM`, layer `104`, detection index `1` deneyi aynı ayarlarla tekrarlandı. Tek değişiklik `--renormalize-within-box` seçeneğinin açılmasıydı.
+
+Yöntem:
+
+1. Orijinal ham CAM değiştirilmeden `cam_grayscale.npy` olarak kaydedildi.
+2. Görselleştirme için ayrı bir kopya oluşturuldu.
+3. Seçili kutunun dışındaki bütün değerler sıfırlandı.
+4. Kutunun içindeki minimum değer `0`, maksimum değer `1` olacak şekilde yeniden ölçeklendi.
+5. Renkli overlay bu değiştirilmiş görselleştirme kopyasından üretildi.
+
+Doğrulama:
+
+| Kontrol | Sonuç |
+|---|---:|
+| Eski ve yeni ham CAM birebir aynı mı? | `True` |
+| Ham CAM maksimum mutlak farkı | `0.0` |
+| Yeniden normalize edilmiş CAM kutu dışı maksimumu | `0.0` |
+| Kutu içi minimum | `0.0` |
+| Kutu içi maksimum | `0.9999998` |
+
+Yorum:
+
+- Yeniden normalizasyon modelin gradyanını, aktivasyonunu veya ham açıklamasını değiştirmemiştir.
+- Yalnızca hangi bölgelerin kullanıcıya gösterileceğini ve renk ölçeğini değiştirmiştir.
+- Bu nedenle yeniden normalize edilmiş görüntü daha detection-specific görünebilir; fakat bu görünüm tek başına yöntemin daha doğru olduğu anlamına gelmez.
+- Ham CAM'in korunması, görsel sunum ile modelden gelen asıl sinyali birbirinden ayırmamızı sağlar.
+- Raporlamada `renormalize: true/false` bilgisi mutlaka belirtilmelidir.
+- Yeniden normalize edilmiş overlay'in görsel yorumu henüz tamamlanmadı.
 ## Bugünkü genel çıkarımlar
 
 - Grad-CAM'in bir kutuyu açıklayabilmesi için önce NMS sonrası kutunun doğru ham adayla eşleştirilmesi gerekir.
