@@ -424,7 +424,28 @@ Yorum:
 - Bu nedenle yeniden normalize edilmiş görüntü daha detection-specific görünebilir; fakat bu görünüm tek başına yöntemin daha doğru olduğu anlamına gelmez.
 - Ham CAM'in korunması, görsel sunum ile modelden gelen asıl sinyali birbirinden ayırmamızı sağlar.
 - Raporlamada `renormalize: true/false` bilgisi mutlaka belirtilmelidir.
-- Yeniden normalize edilmiş overlay'in görsel yorumu henüz tamamlanmadı.
+### Yeniden normalizasyon görsel yorumu
+
+**Normal GradCAM:**
+
+- Aktivasyon bütün at sırasına yatay bir bant halinde yayılmaktadır.
+- Seçili sağ at üzerinde aktivasyon vardır; ancak en güçlü kırmızı alanların önemli kısmı seçili kutunun dışındadır.
+- Görüntü, klasik GradCAM'in tek detection'a özgü olmadığını açıkça göstermektedir.
+
+**Kutu içinde yeniden normalize edilmiş GradCAM:**
+
+- Kutu dışı tamamen mavi/aktivasyonsuz gösterildiği için sonuç ilk bakışta yalnızca seçili atı açıklıyormuş gibi görünmektedir.
+- Kutu içinde renk kontrastı artmış ve seçili atın gövdesi daha belirgin hâle gelmiştir.
+- Buna rağmen en sıcak kırmızı bölge kutunun sol sınırında yoğunlaşmaktadır; bu bölge komşu atla örtüşen veya komşu atın etkisini taşıyabilecek alana yakındır.
+- Görüntü, ham GradCAM'in detection-specific hâle geldiğini kanıtlamaz. Kutu dışındaki gerçek aktivasyon yalnızca görsel post-processing ile saklanmıştır.
+
+**Sonuç:**
+
+- Yeniden normalizasyon okunabilirliği artırabilir; fakat yöntem kalitesini artırmaz.
+- Normal GradCAM görüntüsü model sinyalinin yaygınlığını daha dürüst biçimde gösterir.
+- Yeniden normalize edilmiş görüntü tek başına sunulursa kullanıcıyı, modelin yalnızca seçili kutuya odaklandığı yönünde yanıltabilir.
+- Raporlarda mümkünse normal ve yeniden normalize edilmiş görüntüler yan yana verilmeli; ham CAM ayrıca korunmalıdır.
+- Bu deney, heatmap görselleştirme tercihlerinin yorumu model kadar güçlü biçimde etkileyebildiğini göstermektedir.
 ## Bugünkü genel çıkarımlar
 
 - Grad-CAM'in bir kutuyu açıklayabilmesi için önce NMS sonrası kutunun doğru ham adayla eşleştirilmesi gerekir.
@@ -435,5 +456,4 @@ Yorum:
 
 ## Sonraki adımlar
 
-- Kutu içi yeniden normalizasyonu ayrı bir deney olarak uygulayıp sonucu yanıltıcı biçimde güzelleştirip güzelleştirmediğini tartışmak.
 - Deney sonuçlarını bu Gün 4 notuna eklemeye devam etmek.
