@@ -456,4 +456,6 @@ Yorum:
 
 ## Sonraki adımlar
 
-- Deney sonuçlarını bu Gün 4 notuna eklemeye devam etmek.
+- Gün 4 teknik deneyleri tamamlandı.
+- Kısa mentor raporu: `notes/day4_mentor_report.md`
+- Sonraki çalışmada gerçek bir false-positive görüntü ve varsa fine-tuned YOLOv7 ağırlığı üzerinde aynı pipeline tekrarlanacak.
