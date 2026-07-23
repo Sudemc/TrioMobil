@@ -4,6 +4,30 @@
 
 YOLOv7'nin NMS sonrasında kalan tek bir tespitini, doğru ham model adayıyla eşleştirmek ve seçilen adayın sınıf skoruna göre Grad-CAM heatmap üretmek.
 
+## Raporun amacı ve nasıl okunacağı
+
+Bu rapor iki amaçla hazırlanmıştır:
+
+1. Gün içinde yapılan geliştirmeleri, deneyleri, hataları ve sonuçları mentora teknik kanıtlarıyla sunmak.
+2. Daha sonra çalışmaya geri dönüldüğünde yalnızca komutları değil, her adımın neden yapıldığını ve sonuçların nasıl yorumlanması gerektiğini yeniden öğrenebilmek.
+
+Görseller okunurken:
+
+- **Yeşil kutu**, NMS sonrasında seçilen ve açıklanmak istenen detection'dır.
+- **Kırmızı/sarı bölgeler**, seçilen class skoruyla daha yüksek pozitif ilişki gösteren CAM bölgeleridir.
+- **Mavi bölgeler**, ilgili CAM içinde göreli aktivasyonu düşük bölgelerdir; “model bu bölgeyi kesinlikle kullanmadı” anlamına gelmez.
+- CAM bir **nedensellik kanıtı değildir**. Skorla ilişkili bölgeleri gösterir; modelin kararının tek ve kesin nedenini kanıtlamaz.
+- Renkli overlay tek başına yeterli değildir. Ham CAM, metadata ve sayısal karşılaştırma sonuçlarıyla birlikte değerlendirilmelidir.
+
+## Deney tasarımının özeti
+
+| Aşama | Değiştirilen değişken | Sorulan soru |
+|---|---|---|
+| İki detection için GradCAM | Yalnızca `detection-index` | Heatmap gerçekten seçilen tek kutuya özgü mü? |
+| Ham CAM karşılaştırması | Görsel süslemeler kaldırıldı | İki harita sayısal olarak da aynı mı? |
+| Tek katman deneyleri | `102`, `103`, `104` ayrı çalıştırıldı | Sonucu hangi detection ölçeği üretiyor? |
+| HiResCAM karşılaştırması | Yalnızca CAM yöntemi değiştirildi | Uzamsal gradyanı korumak detection'ları ayırıyor mu? |
+| Kutu içi renormalizasyon | Yalnızca görselleştirme değiştirildi | Daha temiz görüntü daha doğru açıklama anlamına mı geliyor? |
 ## Başlangıç durumu
 
 - Yöntem: `GradCAM`
@@ -250,6 +274,20 @@ OK
 
 ### Görsel karşılaştırma
 
+**Detection index 0 — klasik GradCAM**
+
+![Detection index 0 için GradCAM](assets/day4/01_gradcam_detection0.png)
+
+- Yeşil kutu soldaki büyük beyaz atı seçmektedir.
+- Sıcak aktivasyon yalnızca bu kutuda kalmayıp ortadaki ve sağdaki atlara yatay bir bant hâlinde yayılmaktadır.
+
+**Detection index 1 — klasik GradCAM**
+
+![Detection index 1 için GradCAM](assets/day4/02_gradcam_detection1.png)
+
+- Yeşil kutu sağdaki gri ata taşınmıştır.
+- Ham aday değişmesine rağmen sıcak bölgenin genel şekli belirgin biçimde değişmemiştir.
+
 **Detection index 0:**
 
 - Yeşil kutu soldaki büyük, beyaz atı kapsıyor.
@@ -272,6 +310,16 @@ OK
 - Bu sonuç “model bu tek ata tam olarak neden horse dedi?” sorusunu kesin olarak cevaplamaz. Daha güvenli yorum, modelin `horse` sınıfı için görüntüdeki at benzeri yapılar ve atların bulunduğu genel yatay bölgeyle ilişkili aktivasyon ürettiğidir.
 - Bu gözlem, yönergede belirtilen “güzel görünen heatmap tek başına güvenilir açıklama değildir” sınırlılığına gerçek bir örnektir.
 ## Ham CAM sayısal karşılaştırması
+
+**Detection index 0 ham GradCAM**
+
+![Detection index 0 ham GradCAM](assets/day4/03_gradcam_raw_detection0.png)
+
+**Detection index 1 ham GradCAM**
+
+![Detection index 1 ham GradCAM](assets/day4/04_gradcam_raw_detection1.png)
+
+Bu görüntülerde kutu, sınıf etiketi ve orijinal fotoğraf bulunmaz. Açık bölgeler yüksek, koyu bölgeler düşük göreli CAM değerini gösterir. İki ham görüntünün görsel benzerliği aşağıdaki metriklerle sayısal olarak sınanmıştır.
 
 Renkli overlay, yeşil kutu ve yazının karşılaştırmayı etkilememesi için normalize edilmiş ham CAM matrisi iki biçimde kaydedildi:
 
@@ -307,6 +355,16 @@ Yorum:
 - Olası teknik neden, klasik Grad-CAM'in her kanalın gradyanını uzamsal olarak ortalayıp tek kanal ağırlığına dönüştürmesidir. Aynı sınıfa ait iki konumun benzer kanal ağırlıkları üretmesi, farklı adaylar hedeflense bile aynı aktivasyon haritasının oluşmasına yol açabilir.
 - Sonraki deneyde önce katman ortalamasının etkisi ayrıştırılmalı; her katman tek başına denenmelidir. Sonuç değişmezse uzamsal gradyanı koruyan `LayerCAM` veya `HiResCAM` gibi yöntemler karşılaştırılmalıdır.
 ## Tek katman Grad-CAM deneyleri
+
+**Layer 102 ham CAM — tamamen sıfır**
+
+![Layer 102 boş CAM](assets/day4/05_layer102_blank.png)
+
+**Layer 103 ham CAM — tamamen sıfır**
+
+![Layer 103 boş CAM](assets/day4/06_layer103_blank.png)
+
+Siyah görüntüler bir dosya veya çizim hatası değildir. Seçilen adayların skoruna giden gradyan yolu bu iki katmandan geçmediği için CAM değerleri gerçekten sıfırdır.
 
 Katman ortalamasının iki detection için aynı CAM'i üretip üretmediğini anlamak amacıyla `[102]`, `[103]` ve `[104]` ayrı ayrı test edildi.
 
@@ -359,6 +417,16 @@ Yorum:
 - Yine de kutu içinde aktivasyon bulunması modelin hatasının kesin nedenini kanıtlamaz; yöntem model skoruyla ilişkili konumu gösterir.
 ### HiResCAM görsel yorumu
 
+**Detection index 0 HiResCAM çıktısı**
+
+![Detection index 0 için HiResCAM](assets/day4/07_hirescam_detection0.png)
+
+**Detection index 1 HiResCAM çıktısı**
+
+![Detection index 1 için HiResCAM](assets/day4/08_hirescam_detection1.png)
+
+Bu iki görsel birlikte okunduğunda detection index değişince sıcak bölgenin de seçilen ata taşındığı görülmektedir.
+
 **Detection index 0:**
 
 - Yeşil kutu soldaki büyük beyaz atı kapsamaktadır.
@@ -379,6 +447,13 @@ Yorum:
 - Sıcak bölgelerin küçük ve elmas/piksel bloklu görünmesi layer `104` feature map'inin düşük uzamsal çözünürlüğünün `640 × 640` görüntüye büyütülmesinden kaynaklanır.
 - Sonuç konum açısından başarılıdır; fakat ayrıntılı anatomik yorum için layer `104` çözünürlüğü sınırlıdır.
 ## Aynı detection için GradCAM ve HiResCAM
+
+Görsel karşılaştırmada klasik GradCAM'in bütün at sırasına yayıldığı, HiResCAM'in ise seçilen atın gövdesinde küçük ve ayrışmış bir bölge oluşturduğu görülmektedir. Burada HiResCAM, GradCAM görüntüsünü yalnızca kırpmamış; farklı bir CAM hesabıyla uzamsal olarak farklı sonuç üretmiştir.
+
+| Detection | GradCAM | HiResCAM |
+|---:|---|---|
+| Index `0` | ![Index 0 GradCAM](assets/day4/01_gradcam_detection0.png) | ![Index 0 HiResCAM](assets/day4/07_hirescam_detection0.png) |
+| Index `1` | ![Index 1 GradCAM](assets/day4/02_gradcam_detection1.png) | ![Index 1 HiResCAM](assets/day4/08_hirescam_detection1.png) |
 
 Aynı seçili detection üzerinde yalnızca CAM yöntemi değiştirilerek GradCAM ve HiResCAM ham matrisleri karşılaştırıldı.
 
@@ -426,6 +501,16 @@ Yorum:
 - Raporlamada `renormalize: true/false` bilgisi mutlaka belirtilmelidir.
 ### Yeniden normalizasyon görsel yorumu
 
+| Normal GradCAM | Kutu içinde yeniden normalize edilmiş GradCAM |
+|---|---|
+| ![Normal GradCAM](assets/day4/02_gradcam_detection1.png) | ![Kutu içinde yeniden normalize edilmiş GradCAM](assets/day4/09_gradcam_box_renormalized.png) |
+
+**Yalnızca görselleştirmede kullanılan yeniden normalize edilmiş CAM matrisi**
+
+![Kutu içinde yeniden normalize edilmiş CAM matrisi](assets/day4/10_cam_box_renormalized.png)
+
+Bu matris modelden yeniden hesaplanmış yeni bir açıklama değildir. Ham CAM'in bir kopyasında kutu dışı değerler sıfırlanmış ve kutu içi değerler `0–1` aralığında yeniden ölçeklenmiştir.
+
 **Normal GradCAM:**
 
 - Aktivasyon bütün at sırasına yatay bir bant halinde yayılmaktadır.
@@ -453,6 +538,16 @@ Yorum:
 - Güzel görünen bir heatmap tek başına doğru açıklama olduğunu kanıtlamaz.
 - Feature layer seçimi, tensor boyutları, gradyan akışı ve preprocessing ayarları heatmap'in anlamını doğrudan etkiler.
 - Çalışan her deney; kullanılan model, target, katmanlar, eşik, kutu, ham aday ve normalizasyon ayarlarıyla birlikte kaydedilmelidir.
+
+## Mentora sunulabilecek sonuç özeti
+
+- NMS sonrasında seçilen tek bir kutuyu doğru ham YOLOv7 adayıyla eşleştiren ve bu adayın class skorunu hedefleyen açıklama pipeline'ı tamamlandı.
+- Klasik GradCAM, aynı sınıftaki iki farklı detection için neredeyse aynı haritayı üretti; Pearson korelasyonu yaklaşık `1.0`, en sıcak %10 örtüşmesi `1.0` oldu.
+- Seçilen adayların üçüncü detection ölçeğinden geldiği ve gerçek gradyan yolunun layer `104` üzerinden geçtiği doğrulandı. Bu nedenle layer `102` ve `103` CAM'leri sıfır kaldı.
+- HiResCAM kullanıldığında iki detection ayrıştı; en sıcak bölgelerin örtüşmesi `0.0` ve her haritanın sıcak piksellerinin kendi kutusunda kalma oranı `1.0` oldu.
+- Kutu içi yeniden normalizasyonun ham CAM'i değiştirmediği, yalnızca kutu dışı aktivasyonu görsel olarak sakladığı gösterildi.
+- Bu görüntü için tek-detection açıklamasında `HiResCAM + layer 104`, klasik GradCAM'e göre daha uygun sonuç verdi. Bunun tüm görüntüler için genel bir üstünlük olduğu iddia edilmedi.
+- Pipeline ve yardımcı fonksiyonlar toplam `14` otomatik testle doğrulandı.
 
 ## Sonraki adımlar
 
