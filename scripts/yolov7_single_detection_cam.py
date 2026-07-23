@@ -6,7 +6,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 import torch
-from pytorch_grad_cam import GradCAM
+from pytorch_grad_cam import GradCAM, HiResCAM, LayerCAM
 from pytorch_grad_cam.utils.image import show_cam_on_image
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,8 +57,22 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--detection-index", type=int, default=0)
     parser.add_argument("--conf-threshold", type=float, default=0.25)
     parser.add_argument("--img-size", type=int, default=640)
+    parser.add_argument(
+        "--target-layers", nargs="+", type=int, default=[102, 103, 104]
+    )
+    parser.add_argument(
+        "--method",
+        choices=["GradCAM", "HiResCAM", "LayerCAM"],
+        default="GradCAM",
+    )
     parser.add_argument("--device", default="cuda:0")
     return parser.parse_args()
+
+
+def save_grayscale_cam(grayscale_cam: np.ndarray, output: Path) -> None:
+    np.save(output / "cam_grayscale.npy", grayscale_cam)
+    grayscale_image = (np.clip(grayscale_cam, 0.0, 1.0) * 255).astype(np.uint8)
+    cv2.imwrite(str(output / "cam_grayscale.png"), grayscale_image)
 
 
 def main() -> None:
@@ -89,8 +103,13 @@ def main() -> None:
     raw_index = match_raw_candidate(raw_predictions[0], selected)
     class_id = int(selected[5].item())
 
-    target_layers = [model.model[index] for index in [102, 103, 104]]
-    cam = GradCAM(
+    target_layers = [model.model[index] for index in args.target_layers]
+    cam_class = {
+        "GradCAM": GradCAM,
+        "HiResCAM": HiResCAM,
+        "LayerCAM": LayerCAM,
+    }[args.method]
+    cam = cam_class(
         model=wrapped_model,
         target_layers=target_layers,
         use_cuda=device.type == "cuda",
@@ -99,6 +118,7 @@ def main() -> None:
         input_tensor,
         targets=[ClassScoreTarget(raw_index, class_id)],
     )[0]
+    save_grayscale_cam(grayscale_cam, output)
     overlay = cv2.cvtColor(
         show_cam_on_image(rgb_image, grayscale_cam, use_rgb=True),
         cv2.COLOR_RGB2BGR,
@@ -121,10 +141,11 @@ def main() -> None:
     metadata = {
         "weights": args.weights,
         "source": args.source,
-        "method": "GradCAM",
+        "method": args.method,
         "target_mode": "class",
-        "target_layers": [102, 103, 104],
+        "target_layers": args.target_layers,
         "conf_threshold": args.conf_threshold,
+        "img_size": args.img_size,
         "detection_index": args.detection_index,
         "class_id": class_id,
         "class_name": model.names[class_id],
@@ -132,6 +153,8 @@ def main() -> None:
         "selected_box_xyxy": [x1, y1, x2, y2],
         "raw_candidate_index": raw_index,
         "renormalize": False,
+        "raw_cam_numpy": "cam_grayscale.npy",
+        "raw_cam_image": "cam_grayscale.png",
     }
     (output / "metadata.json").write_text(
         json.dumps(metadata, indent=2), encoding="utf-8"

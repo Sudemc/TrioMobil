@@ -247,7 +247,116 @@ OK
 - İki kutu farklı ham adaylara eşleşti: `24224` ve `24213`.
 - Her iki deney de aynı `horse` class-score target'ını kullandı.
 - Bu sonuç, komutun detection index'e göre farklı bir açıklama hedefi seçtiğini metadata seviyesinde doğruladı.
-- Heatmap'in gerçekten kendi yeşil kutusunu takip edip etmediğine dair görsel yorum henüz yazılmadı.
+
+### Görsel karşılaştırma
+
+**Detection index 0:**
+
+- Yeşil kutu soldaki büyük, beyaz atı kapsıyor.
+- En sıcak kırmızı/turuncu alan seçili kutunun bir bölümünü kapsıyor.
+- Ancak sıcaklık yalnızca seçili atta kalmıyor; ortadaki ve sağdaki atlara da yatay bir bant halinde yayılıyor.
+
+**Detection index 1:**
+
+- Yeşil kutu sağdaki gri atı kapsıyor.
+- Seçili at üzerinde sarı/turuncu aktivasyon bulunuyor.
+- Buna rağmen en güçlü kırmızı alan seçilen kutunun dışında, soldaki ve ortadaki atların üzerinde kalıyor.
+
+**Yorum:**
+
+- Detection index değiştiğinde yeşil kutu ve ham aday değişiyor; fakat heatmap'in genel şekli belirgin biçimde değişmiyor.
+- Her iki heatmap de tek bir at yerine görüntüdeki bütün at sırasını ve atların bulunduğu yatay bölgeyi vurguluyor.
+- Index 1 heatmap'i seçilen sağ atı tamamen görmezden gelmiyor, ancak en güçlü aktivasyon seçili kutuya ait değil.
+- Bu nedenle mevcut sonuç metadata seviyesinde detection-specific olsa da görsel seviyede güçlü biçimde detection-specific değildir.
+- Muhtemel nedenler; iki hedefin de aynı `horse` sınıfına ait olması, Grad-CAM'in düşük uzamsal çözünürlüğü, üç katmanın ortalamasının alınması ve kutu dışı alanların yeniden normalize edilmemesidir.
+- Bu sonuç “model bu tek ata tam olarak neden horse dedi?” sorusunu kesin olarak cevaplamaz. Daha güvenli yorum, modelin `horse` sınıfı için görüntüdeki at benzeri yapılar ve atların bulunduğu genel yatay bölgeyle ilişkili aktivasyon ürettiğidir.
+- Bu gözlem, yönergede belirtilen “güzel görünen heatmap tek başına güvenilir açıklama değildir” sınırlılığına gerçek bir örnektir.
+## Ham CAM sayısal karşılaştırması
+
+Renkli overlay, yeşil kutu ve yazının karşılaştırmayı etkilememesi için normalize edilmiş ham CAM matrisi iki biçimde kaydedildi:
+
+- `cam_grayscale.npy`: Sayısal karşılaştırma için kayıpsız matris
+- `cam_grayscale.png`: Görsel inceleme için gri görüntü
+
+Karşılaştırma sonuçları:
+
+| Metrik | Sonuç |
+|---|---:|
+| Pearson korelasyonu | `0.9999999999998445` |
+| Kosinüs benzerliği | `0.9999999403953552` |
+| Ortalama mutlak fark | `0.0000002022` |
+| En sıcak %10 bölgenin Jaccard örtüşmesi | `1.0` |
+
+Kutu içi ölçümler:
+
+| Ölçüm | Sonuç |
+|---|---:|
+| CAM 0'ın kendi kutusundaki ortalaması | `0.681458` |
+| CAM 0'ın diğer kutudaki ortalaması | `0.695974` |
+| CAM 1'in kendi kutusundaki ortalaması | `0.695974` |
+| CAM 1'in diğer kutudaki ortalaması | `0.681459` |
+| CAM 0'ın en sıcak %10 piksellerinin kendi kutusundaki oranı | `0.616040` |
+| CAM 1'in en sıcak %10 piksellerinin kendi kutusundaki oranı | `0.182935` |
+
+Yorum:
+
+- İki farklı ham aday hedeflenmesine rağmen iki CAM pratik olarak aynıdır.
+- CAM 0'ın aktivasyonu kendi kutusundan çok diğer kutuda biraz daha yüksektir.
+- CAM 1 için en sıcak piksellerin yalnızca yaklaşık `%18.3`ü kendi kutusundadır.
+- Bu nedenle mevcut klasik Grad-CAM sonucu tek tespit açıklaması olarak yeterince ayrıştırıcı değildir.
+- Olası teknik neden, klasik Grad-CAM'in her kanalın gradyanını uzamsal olarak ortalayıp tek kanal ağırlığına dönüştürmesidir. Aynı sınıfa ait iki konumun benzer kanal ağırlıkları üretmesi, farklı adaylar hedeflense bile aynı aktivasyon haritasının oluşmasına yol açabilir.
+- Sonraki deneyde önce katman ortalamasının etkisi ayrıştırılmalı; her katman tek başına denenmelidir. Sonuç değişmezse uzamsal gradyanı koruyan `LayerCAM` veya `HiResCAM` gibi yöntemler karşılaştırılmalıdır.
+## Tek katman Grad-CAM deneyleri
+
+Katman ortalamasının iki detection için aynı CAM'i üretip üretmediğini anlamak amacıyla `[102]`, `[103]` ve `[104]` ayrı ayrı test edildi.
+
+| Target layer | Index 0 CAM | Index 1 CAM | Karşılaştırma |
+|---:|---|---|---|
+| `102` | Tamamen sıfır | Tamamen sıfır | Benzerlik tanımsız |
+| `103` | Tamamen sıfır | Tamamen sıfır | Benzerlik tanımsız |
+| `104` | Dolu | Dolu | Pearson ≈ `1.0`, Jaccard `1.0` |
+
+Layer 104 sonuçları:
+
+- Pearson korelasyonu: `0.9999999999998496`
+- Kosinüs benzerliği: `1.0`
+- Ortalama mutlak fark: `0.0000001896`
+- En sıcak %10 örtüşmesi: `1.0`
+
+Yorum:
+
+- Ham aday indeksleri `24224` ve `24213`, concatenated YOLO çıktısının üçüncü ölçeğine düşmektedir.
+- Bu nedenle bu adayların class skorlarına giden gradyan yolu layer `104` üzerinden geçer; layer `102` ve `103` için gradyan sıfırdır.
+- Üç katman birlikte kullanıldığında görülen CAM, pratikte yalnızca layer `104` CAM'idir. Diğer iki boş CAM ortalamaya katılsa da son normalizasyon genel şekli değiştirmez.
+- Layer `104` tek başına da iki detection için aynı haritayı üretmektedir. Dolayısıyla benzerliğin nedeni katman ortalaması değildir.
+- Bulgular klasik Grad-CAM'in uzamsal gradyanı kanal başına tek sayıya indirgemesinin, aynı sınıftaki farklı konumları ayırmada yetersiz kaldığı hipotezini desteklemektedir.
+- Sonraki yöntem karşılaştırmasında uzamsal gradyanı koruyan `HiResCAM` veya `LayerCAM` kullanılmalıdır.
+## HiResCAM karşılaştırması
+
+Klasik Grad-CAM'in uzamsal ortalama nedeniyle iki detection'ı ayıramadığı hipotezini test etmek için layer `104` üzerinde `HiResCAM` çalıştırıldı. HiResCAM, kanal başına global gradyan ortalaması kullanmak yerine her konumda `gradient × activation` hesaplar.
+
+Her iki deneyde model, görüntü, class-score target, layer ve preprocessing aynı tutuldu; yalnızca detection index değiştirildi.
+
+| Metrik | HiResCAM sonucu |
+|---|---:|
+| Pearson korelasyonu | `-0.005660` |
+| Kosinüs benzerliği | `0.0` |
+| Ortalama mutlak fark | `0.005160` |
+| En sıcak %10 bölgenin Jaccard örtüşmesi | `0.0` |
+| CAM 0'ın diğer kutudaki ortalaması | `0.0` |
+| CAM 1'in diğer kutudaki ortalaması | `0.0` |
+| CAM 0 sıcak piksellerinin kendi kutusundaki oranı | `1.0` |
+| CAM 1 sıcak piksellerinin kendi kutusundaki oranı | `1.0` |
+
+Yorum:
+
+- İki HiResCAM haritası birbirinden belirgin biçimde ayrılmıştır.
+- En sıcak bölgeler iki detection arasında hiç çakışmamaktadır.
+- Her haritanın en sıcak %10 piksellerinin tamamı kendi seçili kutusunda kalmıştır.
+- Diğer detection kutusunda ortalama aktivasyon sıfırdır.
+- Bu sonuç, ham aday eşleştirme ve class-score target yaklaşımının çalıştığını; klasik Grad-CAM'deki aynı-harita probleminin büyük ölçüde yöntemin uzamsal gradyan ortalamasından kaynaklandığını destekler.
+- Bu örnek için HiResCAM, klasik Grad-CAM'e göre çok daha detection-specific bir açıklama üretmektedir.
+- Yine de kutu içinde aktivasyon bulunması modelin hatasının kesin nedenini kanıtlamaz; yöntem model skoruyla ilişkili konumu gösterir.
 ## Bugünkü genel çıkarımlar
 
 - Grad-CAM'in bir kutuyu açıklayabilmesi için önce NMS sonrası kutunun doğru ham adayla eşleştirilmesi gerekir.
@@ -258,7 +367,7 @@ OK
 
 ## Sonraki adımlar
 
-- İlk heatmap'in seçilen yeşil kutuyla ilişkisini görsel olarak yorumlamak.
-- `--img-size 640` deneylerinin görsel sonuçlarını karşılaştırmak.
-- İki heatmap'in gerçekten kendi seçili kutularını takip edip etmediğini karşılaştırmak.
+- Kutu içi yeniden normalizasyonu ayrı bir deney olarak uygulayıp sonucu yanıltıcı biçimde güzelleştirip güzelleştirmediğini tartışmak.
+- İki HiResCAM overlay'ini görsel olarak incelemek.
+- Aynı detection üzerinde GradCAM ve HiResCAM sonuçlarını yan yana karşılaştırmak.
 - Deney sonuçlarını bu Gün 4 notuna eklemeye devam etmek.
