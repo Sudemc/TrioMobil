@@ -64,7 +64,7 @@ class TestCamUtils(unittest.TestCase):
             [5., 5., 10., 10., .8, .1, .96],
         ])
         detection = torch.tensor([0., 0., 10., 10., .86, 1.])
-        self.assertEqual(match_raw_candidate(raw, detection), 2)
+        self.assertEqual(match_raw_candidate(raw, detection), 0)
 
 if __name__ == "__main__":
     unittest.main()
